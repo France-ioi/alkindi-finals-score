@@ -11,3 +11,6 @@ $config->db->mysql->user = 'root';
 $config->db->mysql->password = '';
 $config->db->mysql->logged = false;
 
+$config->salt = 0;
+$config->taskUrkPrefix = "https://concours-alkindi.fr/finale2020/";
+
