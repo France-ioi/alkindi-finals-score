@@ -21,7 +21,7 @@
 
      $('#message').bind('input', function() {
        var words = $(this).val().split(/[ ,:;.]+/);
-       var answer = words[words.length - 1].trim();
+       var answer = words[words.length - 1].trim().toUpperCase();
        var code = 0;
        for (var iWord = 0; iWord < words.length; iWord++) {
          var word = words[iWord];
@@ -32,6 +32,7 @@
        }
        $("#code").val(code);
        $("#answer").val(answer);
+       $("#copyTarget").val("");
        var validAnswers = /^[A-Za-z0-9]+$/;
        if (validAnswers.test(answer)) {
           $("#answer").css('background-color','#80FF80');
@@ -66,17 +67,34 @@ echo "<button type='submit'>Valider</button>";
 
 function getChecksum($equipe, $exo) {
    global $config;
-    $tmp = (136 * $equipe + 81 * $exo) % 216;
-    $tmp = (55297 * $tmp) % 98712;
-    // remplacer salt par une autre valeur si on veut
-    $tmp = ($tmp + 27 * 8 * $config->salt) % 98712;
-    //assert tmp%27 == equipe
-    //assert tmp%8 == exo
-    $tmp = "".$tmp;
-    while (strlen($tmp) < 5) {
-        $tmp = '0'.$tmp;
-    }
-    return $tmp;
+
+   $saltMax = 7;
+   $a = $config->maxTasks;
+   $b =  $config->maxTeams;
+   $modTotal = $a*$b*$config->check*$saltMax;
+
+    $u = 5;
+   $v = -2;
+   $u = ($u+$a*$b)%($a*$b);
+   $v = ($v+$a*$b)%($a*$b);
+
+   $tmp = ($a*$u*$equipe + $b*$v*$exo)%($a*$b);
+
+   $u = 11;
+   $v = -71;
+   $u = ($u+$a*$b*$config->check)%($a*$b*$config->check);
+   $v = ($v+$a*$b*$config->check)%($a*$b*$config->check);
+
+   $tmp = ($config->check*$v*$tmp)%($a*$b*$config->check);
+    
+   $salt = ($a * $b) % $saltMax;
+   $tmp = ($tmp + $salt*($a*$b*$config->check)) % $modTotal;
+
+   $tmp = "".$tmp;
+   while (strlen($tmp) < 5) {
+       $tmp = '0'.$tmp;
+   }
+   return $tmp;
 }
 
 function getRecordFromCode($code) {
@@ -84,20 +102,41 @@ function getRecordFromCode($code) {
    if ($code == "") {
       return null;
    }
-   $extract = ($code - $config->salt * 27 * 8 + 98712) % 98712;
-   $teamID = $extract % 27;
-   $question = $extract % 8;
+   $teamID = $code % $config->maxTeams;
+   $question = $code % $config->maxTasks;
+   echo "Team : ".$teamID."<br/>Question : ".$question."<br/>";
    $query = "SELECT ID, teamID, expectedAnswer, question FROM teams_questions WHERE question = :question AND teamID = :teamID";
    $stmt = $db->prepare($query);
    $stmt->execute(array("question" => $question, "teamID" => $teamID));
    $row = $stmt->fetchObject();
-   if (($row == null) || ($extract % 457 != 0)) {
+   if (($row == null) || ($code % $config->check != 0)) {
       echo "<input id='copyTarget' value=\"L'indicatif de sujet ".$code." est invalide !\" />";
+      echo $code;
       return null;
    } else {
       return $row;
    }
 }
+
+function getMessageAndLinkFor($teamID, $question) {
+   global $db, $config;
+   $message = "";
+   $query4 = "SELECT question,startTime FROM teams_questions WHERE teamID = :teamID AND question = :question";
+   $stmt = $db->prepare($query4);
+   $stmt->execute(array("question" => ($question + 1), "teamID" => $teamID));
+   $teamLetter = chr(ord('A')- 1 + $teamID);
+   if ($row = $stmt->fetchObject()) {
+      $checksum = getChecksum($teamID, $row->question);
+      $taskLink = $config->taskUrkPrefix.$row->question."/".$teamLetter."_".$checksum.".html";
+      if ($row->startTime == "") {
+         $message = "Lien pour le sujet ".$row->question." : ".$taskLink;
+      } else {
+         $message = "Sujet ".$row->question." déjà transmis : ".$taskLink;
+      }
+   }
+   return $message;
+}
+
 
 function handleTeamSubmission() {
    global $db,$config;
@@ -141,20 +180,8 @@ function handleTeamSubmission() {
          }
          echo "<p>Équipe : ".$teamID."</p>";
          if ($isValid) {
-            $message = "";
-            $query4 = "SELECT question,startTime FROM teams_questions WHERE teamID = :teamID AND question = :question";
-            $stmt = $db->prepare($query4);
-            $stmt->execute(array("question" => ($question + 1), "teamID" => $teamID));
-            $teamLetter = chr(ord('A')- 1 + $teamID);
-            if ($row = $stmt->fetchObject()) {
-               $checksum = getChecksum($teamID, $row->question);
-               $taskLink = $config->taskUrkPrefix.$row->question."/".$teamLetter."_".$checksum.".html";
-               if ($row->startTime == "") {
-                  $message = "Lien pour le sujet ".$row->question." : ".$taskLink;
-               } else {
-                  $message = "Sujet ".$row->question." déjà transmis : ".$taskLink;
-               }
-            }
+            $message = getMessageAndLinkFor($teamID, $question);
+            
             $query3 = "UPDATE teams_questions SET startTime = NOW() WHERE teamID = :teamID AND question = :question AND startTime IS NULL";
             $stmt = $db->prepare($query3);
             $stmt->execute(array("question" => ($question + 1), "teamID" => $teamID));
@@ -164,7 +191,7 @@ function handleTeamSubmission() {
          }
       }
    }
-   echo "<p><button type='button' id='copyButton' data-clipboard-action='cut' data-clipboard-target='#copyTarget'>Copier dans le presse-papier</button></p>";
+   echo "<p><button type='button' id='copyButton' data-clipboard-action='copy' data-clipboard-target='#copyTarget'>Copier dans le presse-papier</button></p>";
 }
 
 function handleTeamsStarting() {
@@ -212,10 +239,12 @@ function handleTeamsStarting() {
             if (($row->timeStartedSeconds < 30*60) && ($row->isValid == 0)) {
                echo "<p style='color:red;font-weight:bold'>Erreur : l'équipe ".$row->name." a commencé la question ".($startedQuestion["question"] - 1)." il y a ".floor($row->timeStartedSeconds / 60)." minutes seulement. Elle ne peut pas démarrer la suivante.";
             } else {
+               $message = getMessageAndLinkFor($startedQuestion["teamID"], $startedQuestion["question"] - 1);
                $queryStartQuestion = "UPDATE teams_questions SET startTime = NOW() WHERE teamID = :teamID AND question = :question AND startTime IS NULL";
                $stmt2 = $db->prepare($queryStartQuestion);
                $stmt2->execute($startedQuestion);
-               echo "<p>OK : l'équipe ".$row->name." peut commencer la question ".$startedQuestion["question"]."</p>";
+               echo "<p>OK : l'équipe ".$row->name." peut commencer la question ".($startedQuestion["question"])."</p>";
+               echo "<input id='copyTarget' value=\"OK. ".$message."\" />";
             }
          } else {
             echo "<p>Erreur: pas de question précédente.".json_encode($startedQuestion)."</p>";

@@ -93,3 +93,27 @@ COMMIT;
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
 /*!40101 SET CHARACTER_SET_RESULTS=@OLD_CHARACTER_SET_RESULTS */;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
+
+
+CREATE TABLE IF NOT EXISTS `archive_attempts` (
+  `ID` int(11) NOT NULL,
+  `questionID` int(11) NOT NULL,
+  `answerTime` datetime NOT NULL,
+  `answer` text NOT NULL,
+  `isValid` tinyint(4) NOT NULL,
+  `penaltySeconds` int(11) NOT NULL DEFAULT '0'
+);
+
+CREATE TABLE IF NOT EXISTS `archive_teams` (
+  `ID` int(11) NOT NULL,
+  `name` text NOT NULL,
+  `startTime` datetime DEFAULT NULL
+);
+
+CREATE TABLE IF NOT EXISTS `archive_teams_questions` (
+  `ID` int(11) NOT NULL,
+  `teamID` int(11) NOT NULL,
+  `question` int(11) NOT NULL,
+  `expectedAnswer` text NOT NULL,
+  `startTime` datetime DEFAULT NULL
+);
