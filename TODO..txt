@@ -1,0 +1,9 @@
+- Ajouter une feature pour voir facilement qui peut demander son sujet
+
+- Bien revérifier ce qui se passe quand on soumet autre chose que le dernier sujet, si on a démarré plusieurs sujets en parallèle.
+
+- quand la réponse est invalide, mettre le nom du sujet dans le message, pour que les candidats réalisent s'ils ont mis l'indicatif du mauvais sujet
+
+- Ajouter une feature pour déduire du temps sur un sujet, en gardant une trace.
+
+- Ajouter une feature pour gérer automatiquement sur le classement

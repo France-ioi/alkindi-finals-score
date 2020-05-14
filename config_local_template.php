@@ -15,5 +15,8 @@ $config->salt = 0;
 $config->maxTasks = 11;
 $config->maxTeams = 27;
 $config->check = ;
-$config->taskUrkPrefix = "https://concours-alkindi.fr/finale2020/";
+$config->taskUrkPrefix = "";
+$config->password = "";
+$config->hiddenFolder = "";
+$config->publicFolder = "";
 
